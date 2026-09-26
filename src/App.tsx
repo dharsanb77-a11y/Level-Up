@@ -19,6 +19,9 @@ import { ProgressPage } from './pages/ProgressPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { ChatbotPage } from './pages/ChatbotPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { DocsPage } from './pages/DocsPage';
+import { AssessmentSessionPage } from './pages/AssessmentSessionPage';
+import { EmailUpdatesModal } from './components/layout/EmailUpdatesModal';
 import { Loader2, ShieldAlert } from 'lucide-react';
 
 const PROTECTED_ROUTES: PageRoute[] = [
@@ -29,26 +32,34 @@ const PROTECTED_ROUTES: PageRoute[] = [
   'progress',
   'notifications',
   'chatbot',
-  'profile'
+  'profile',
+  'docs',
+  'assessment-session'
 ];
+
+const VALID_ROUTES: PageRoute[] = [
+  'landing', 'login', 'register', 'onboarding', 'dashboard', 
+  'assessments', 'roadmap', 'progress', 'notifications', 'chatbot', 'profile',
+  'docs', 'assessment-session'
+];
+
+function getRouteFromHash(): PageRoute {
+  if (typeof window !== 'undefined' && window.location.hash) {
+    const raw = window.location.hash.replace('#/', '').replace('#', '');
+    const clean = raw.split('?')[0] as PageRoute;
+    if (VALID_ROUTES.includes(clean)) {
+      return clean;
+    }
+  }
+  return 'landing';
+}
 
 function AppContent() {
   const { user, isAuthenticated, isLoading } = useAuth();
+  const [showEmailModal, setShowEmailModal] = useState<boolean>(false);
   
   // Track active route, sync with window.location.hash
-  const [currentRoute, setCurrentRoute] = useState<PageRoute>(() => {
-    if (typeof window !== 'undefined' && window.location.hash) {
-      const hash = window.location.hash.replace('#/', '').replace('#', '') as PageRoute;
-      const validRoutes: PageRoute[] = [
-        'landing', 'login', 'register', 'onboarding', 'dashboard', 
-        'assessments', 'roadmap', 'progress', 'notifications', 'chatbot', 'profile'
-      ];
-      if (validRoutes.includes(hash)) {
-        return hash;
-      }
-    }
-    return 'landing';
-  });
+  const [currentRoute, setCurrentRoute] = useState<PageRoute>(() => getRouteFromHash());
 
   // Keep hash in sync with route
   const handleNavigate = (route: PageRoute) => {
@@ -59,17 +70,11 @@ function AppContent() {
     }
   };
 
-  // Listen to browser hash changes (e.g. back/forward buttons)
+  // Listen to browser hash changes (e.g. back/forward buttons or opening links)
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash.replace('#/', '').replace('#', '') as PageRoute;
-      const validRoutes: PageRoute[] = [
-        'landing', 'login', 'register', 'onboarding', 'dashboard', 
-        'assessments', 'roadmap', 'progress', 'notifications', 'chatbot', 'profile'
-      ];
-      if (validRoutes.includes(hash)) {
-        setCurrentRoute(hash);
-      }
+      const route = getRouteFromHash();
+      setCurrentRoute(route);
     };
 
     window.addEventListener('hashchange', handleHashChange);
@@ -83,13 +88,11 @@ function AppContent() {
     const isProtected = PROTECTED_ROUTES.includes(currentRoute);
 
     if (isProtected && !isAuthenticated) {
-      // User is attempting to access a protected route while unauthenticated
       handleNavigate('login');
       return;
     }
 
     if (isAuthenticated) {
-      // If user is authenticated and lands on login or register, redirect
       if (currentRoute === 'login' || currentRoute === 'register') {
         if (!user?.onboardingCompleted) {
           handleNavigate('onboarding');
@@ -155,6 +158,10 @@ function AppContent() {
         return <ChatbotPage onNavigate={handleNavigate} />;
       case 'profile':
         return <ProfilePage onNavigate={handleNavigate} />;
+      case 'docs':
+        return <DocsPage onNavigate={handleNavigate} />;
+      case 'assessment-session':
+        return <AssessmentSessionPage onNavigate={handleNavigate} />;
       default:
         return <LandingPage onNavigate={handleNavigate} />;
     }
@@ -162,11 +169,21 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col font-sans antialiased text-slate-100">
-      <Navbar currentRoute={currentRoute} onNavigate={handleNavigate} />
+      <Navbar 
+        currentRoute={currentRoute} 
+        onNavigate={handleNavigate} 
+        onOpenEmails={() => setShowEmailModal(true)} 
+      />
       <main className="flex-1">
         {renderPage()}
       </main>
       <Footer onNavigate={handleNavigate} />
+      
+      {/* Email Dispatch History Viewer Modal */}
+      <EmailUpdatesModal 
+        isOpen={showEmailModal} 
+        onClose={() => setShowEmailModal(false)} 
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { Student, Department, AcademicYear, AppNotification, Assessment, RoadmapActivity, AssessmentResult } from '../types';
 import { SEED_ROADMAP_ACTIVITIES } from '../data/seedData';
 import { ALL_ASSESSMENTS } from '../data/assessmentQuestions';
+import { EmailService } from './emailService';
 
 const STUDENTS_KEY = 'placement_ready_students_v1';
 const CURRENT_USER_KEY = 'placement_ready_current_user_v1';
@@ -160,6 +161,9 @@ export const StorageService = {
       linkRoute: 'onboarding'
     });
 
+    // Send cheerful welcome & progress start email to user's registered email
+    EmailService.sendProgressEmail(newStudent, 'registration');
+
     return { success: true, student: newStudent };
   },
 
@@ -245,6 +249,11 @@ export const StorageService = {
       linkRoute: 'dashboard'
     });
 
+    // Send cheerful onboarding completion email
+    EmailService.sendProgressEmail(updatedStudent, 'onboarding_completed', {
+      department
+    });
+
     return updatedStudent;
   },
 
@@ -264,6 +273,12 @@ export const StorageService = {
     students[index] = updated;
     this.saveStudents(students);
     this.setCurrentStudent(updated);
+
+    // Send profile update email if user updated key credentials
+    if (updates.knownTechnologies || updates.targetRole || updates.cgpa || updates.targetCompanies || updates.resumeStatus) {
+      EmailService.sendProgressEmail(updated, 'profile_updated');
+    }
+
     return updated;
   },
 
@@ -409,24 +424,25 @@ export const StorageService = {
       });
     });
 
-    let notifTitle = 'Placement Preparation Re-engagement 🚀';
+    const firstName = student.name.split(' ')[0] || 'Friend';
+    let notifTitle = `✨ Keep shining, ${firstName}!`;
     let notifMessage = '';
     let targetRoute: 'assessments' | 'roadmap' | 'dashboard' = 'roadmap';
 
     if (weakTopics.length > 0) {
       const topWeak = weakTopics[0];
-      notifTitle = `Revisit Weak Area: ${topWeak.topic} ⚠️`;
-      notifMessage = `You haven't practiced in ${hoursInactive >= 24 ? hoursInactive : 28} hours. Your diagnostic identified ${topWeak.topic} (${topWeak.category}) as a weak area (${topWeak.percentage}% accuracy). Revisit your roadmap to maintain momentum!`;
+      notifTitle = `🌟 5 min to conquer ${topWeak.topic}!`;
+      notifMessage = `Hey ${firstName}! A quick 5-minute review on ${topWeak.topic} will boost your readiness score. You've got this, jump back in!`;
       targetRoute = 'roadmap';
     } else if (student.knownTechnologies && student.knownTechnologies.length > 0) {
       const tech = student.knownTechnologies[0];
-      notifTitle = `Keep Your Placement Momentum! 🎯`;
-      notifMessage = `You haven't practiced ${tech} recently. Your roadmap recommends continuing your ${student.department || 'engineering'} milestones next.`;
+      notifTitle = `🚀 You're doing amazing, ${firstName}!`;
+      notifMessage = `Your placement dream is built one day at a time! Take a quick peek at your ${tech} milestones and keep your streak blazing.`;
       targetRoute = 'roadmap';
     } else {
-      notifTitle = `Resume Your Placement Roadmap 📋`;
-      notifMessage = `You've been away for ${hoursInactive >= 24 ? hoursInactive : 28} hours. Complete your diagnostic assessments to discover topic-level strengths.`;
-      targetRoute = 'assessments';
+      notifTitle = `🎉 We believe in you, ${firstName}!`;
+      notifMessage = `Ready to level up today? Take 5 minutes to explore your personalized roadmap and boost your placement confidence!`;
+      targetRoute = 'roadmap';
     }
 
     const notification: AppNotification = {
@@ -441,6 +457,11 @@ export const StorageService = {
     };
 
     this.addNotification(notification);
+
+    // Send cheerful, motivating progress email to user's registered address
+    EmailService.sendProgressEmail(student, 'inactivity_reminder', {
+      hoursInactive: forceSimulate ? 26 : hoursInactive
+    });
 
     // Update lastInactivityReminderAt and if forced simulation, also simulate lastActiveAt to 26 hours ago
     const updates: Partial<Student> = { 
@@ -472,25 +493,22 @@ export const StorageService = {
   getStudentStreak(studentId: string): { currentStreak: number; longestStreak: number; lastActivityDate: string } {
     const dates = new Set<string>();
 
-    const student = this.getStudents().find((s) => s.id === studentId);
-    if (student) {
-      if (student.createdAt) dates.add(student.createdAt.substring(0, 10));
-      if (student.lastLoginAt) dates.add(student.lastLoginAt.substring(0, 10));
-      if (student.lastActiveAt) dates.add(student.lastActiveAt.substring(0, 10));
-    }
-
+    // Accumulate dates from actual assessment completions
     const results = this.getAssessmentResults(studentId);
     results.forEach((r) => {
       if (r.completedAt) dates.add(r.completedAt.substring(0, 10));
     });
 
+    // Accumulate dates from actual roadmap milestone completions
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         const raw = window.localStorage.getItem(`placement_ready_roadmap_status_v1_${studentId}`);
         if (raw) {
           const statuses = JSON.parse(raw);
           Object.values(statuses).forEach((item: any) => {
-            if (item?.completedAt) dates.add(item.completedAt.substring(0, 10));
+            if (item?.status === 'completed' && item?.completedAt) {
+              dates.add(item.completedAt.substring(0, 10));
+            }
           });
         }
       }
@@ -503,7 +521,7 @@ export const StorageService = {
     const yesterdayStr = new Date(Date.now() - 86400000).toISOString().substring(0, 10);
 
     if (dateList.length === 0) {
-      return { currentStreak: 1, longestStreak: 1, lastActivityDate: todayStr };
+      return { currentStreak: 0, longestStreak: 0, lastActivityDate: '' };
     }
 
     let currentStreak = 0;
@@ -522,12 +540,12 @@ export const StorageService = {
         }
       }
     } else {
-      currentStreak = 1;
+      currentStreak = 0; // Inactive, streak reset
     }
 
     return {
-      currentStreak: Math.max(1, currentStreak),
-      longestStreak: Math.max(currentStreak, Math.min(7, dateList.length + 1)),
+      currentStreak,
+      longestStreak: Math.max(currentStreak, dateList.length),
       lastActivityDate: dateList[0] || todayStr
     };
   },

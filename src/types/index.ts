@@ -232,4 +232,6 @@ export type PageRoute =
   | 'progress' 
   | 'notifications' 
   | 'chatbot' 
-  | 'profile';
+  | 'profile'
+  | 'docs'
+  | 'assessment-session';

@@ -239,27 +239,22 @@ export const AnalyticsService = {
         `Diagnostic Assessments: Average score of ${Math.round(avgPercent)}% across ${results.length} tests (${categoriesCovered}/4 categories attempted).`
       );
     } else {
-      assessmentScore = 20; // baseline before taking any tests
-      explanations.push(`Diagnostic Assessments: No assessments completed yet. Take tests to boost this component.`);
+      assessmentScore = 0; // Pure 0 baseline before taking any tests
+      explanations.push(`Diagnostic Assessments: 0 assessments completed. Take tests to boost this score.`);
     }
 
     // --- PILLAR 2: Topic & Skill Coverage (Weight: 25%) ---
     let skillScore = 0;
     const techCount = student?.knownTechnologies?.length || 0;
-    if (techCount >= 6) {
-      skillScore = 95;
-    } else if (techCount >= 4) {
-      skillScore = 80;
-    } else if (techCount >= 2) {
-      skillScore = 60;
-    } else if (techCount >= 1) {
-      skillScore = 40;
+    if (techCount > 0) {
+      skillScore = Math.min(100, Math.round((techCount / 6) * 100));
+      explanations.push(
+        `Skill Coverage: ${techCount} technologies registered (${skillScore}% syllabus coverage).`
+      );
     } else {
-      skillScore = 20;
+      skillScore = 0;
+      explanations.push(`Skill Coverage: 0 technologies added. Add your known tools in profile to boost this.`);
     }
-    explanations.push(
-      `Skill Coverage: ${techCount} technologies registered in profile (${student?.department || 'Engineering'} curriculum aligned).`
-    );
 
     // --- PILLAR 3: Practice & Topic Mastery (Weight: 20%) ---
     let practiceScore = 0;
@@ -282,31 +277,33 @@ export const AnalyticsService = {
     }
 
     if (results.length > 0 || completedRoadmapActivities > 0) {
-      // Reward strong topics and completed roadmap milestones, penalize unaddressed weak topics
-      const basePractice = 40;
-      const strongBonus = Math.min(30, strongCount * 7);
-      const weakPenalty = Math.min(25, weakCount * 5);
-      const roadmapBonus = Math.min(35, completedRoadmapActivities * 6);
-      practiceScore = Math.max(10, Math.min(100, basePractice + strongBonus + roadmapBonus - weakPenalty));
+      const strongBonus = Math.min(40, strongCount * 10);
+      const roadmapBonus = Math.min(60, completedRoadmapActivities * 10);
+      const weakPenalty = Math.min(20, weakCount * 5);
+      practiceScore = Math.max(0, Math.min(100, strongBonus + roadmapBonus - weakPenalty));
       explanations.push(
         `Topic Mastery & Practice: ${strongCount} strong topics mastered, ${completedRoadmapActivities} roadmap milestones completed, ${weakCount} weak areas flagged.`
       );
     } else {
-      practiceScore = 30;
-      explanations.push(`Topic Mastery: Awaiting diagnostic test results and roadmap practice milestones.`);
+      practiceScore = 0;
+      explanations.push(`Topic Mastery: 0 diagnostic tests or roadmap milestones completed yet.`);
     }
 
     // --- PILLAR 4: Interview Preparedness & Profile Completeness (Weight: 20%) ---
-    let interviewScore = 35;
-    if (student?.cgpa) interviewScore += 15;
-    if (student?.targetRole) interviewScore += 15;
-    if (student?.targetCompanies && student.targetCompanies.length > 0) interviewScore += 15;
-    if (student?.githubUrl || student?.linkedinUrl) interviewScore += 10;
-    if (student?.resumeStatus === 'Reviewed' || student?.resumeStatus === 'Ready for Campus') interviewScore += 10;
+    let interviewScore = 0;
+    if (student?.cgpa) interviewScore += 20;
+    if (student?.targetRole) interviewScore += 20;
+    if (student?.targetCompanies && student.targetCompanies.length > 0) interviewScore += 20;
+    if (student?.githubUrl || student?.linkedinUrl) interviewScore += 15;
+    if (student?.resumeStatus === 'Reviewed' || student?.resumeStatus === 'Ready for Campus') {
+      interviewScore += 25;
+    } else if (student?.resumeStatus === 'Drafting') {
+      interviewScore += 10;
+    }
     interviewScore = Math.min(100, interviewScore);
 
     explanations.push(
-      `Career Preparedness: Academic stage ${student?.currentYear || 'Prep'} with ${student?.cgpa ? 'CGPA recorded' : 'CGPA pending'}, resume status "${student?.resumeStatus || 'Drafting'}", and ${student?.targetCompanies?.length || 0} target companies.`
+      `Career Preparedness: Academic stage ${student?.currentYear || 'Prep'}, ${student?.cgpa ? 'CGPA recorded' : 'CGPA pending'}, resume status "${student?.resumeStatus || 'Not Started'}", and ${student?.targetCompanies?.length || 0} target companies.`
     );
 
     // --- Composite Deterministic Score ---
@@ -321,7 +318,7 @@ export const AnalyticsService = {
       practiceScore * weightPractice +
       interviewScore * weightInterview;
 
-    const overallScore = Math.round(Math.max(10, Math.min(100, rawTotal)));
+    const overallScore = Math.round(Math.max(0, Math.min(100, rawTotal)));
 
     let level: 'Needs Preparation' | 'Developing' | 'Competent' | 'Placement Ready';
     if (overallScore >= 80) {
@@ -334,16 +331,14 @@ export const AnalyticsService = {
       level = 'Needs Preparation';
     }
 
-    // Category progress metrics
+    // Category progress metrics - 0 if not attempted yet
     const getCategoryProgress = (cat: AssessmentCategory): number => {
       const catResults = results.filter((r) => r.category === cat);
       if (catResults.length > 0) {
-        // Return latest percentage
         const latest = catResults[catResults.length - 1];
         return latest.percentage;
       }
-      // Baseline placeholder if not taken yet
-      return 25;
+      return 0; // Pure 0 baseline until taken
     };
 
     return {

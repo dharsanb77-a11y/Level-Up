@@ -9,6 +9,7 @@ import {
   TrendingUp, 
   Bot, 
   Bell, 
+  Mail,
   User, 
   LogOut, 
   Menu, 
@@ -19,9 +20,10 @@ import {
 interface NavbarProps {
   currentRoute: PageRoute;
   onNavigate: (route: PageRoute) => void;
+  onOpenEmails?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentRoute, onNavigate }) => {
+export const Navbar: React.FC<NavbarProps> = ({ currentRoute, onNavigate, onOpenEmails }) => {
   const { user, isAuthenticated, logout, unreadNotificationsCount } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -140,6 +142,18 @@ export const Navbar: React.FC<NavbarProps> = ({ currentRoute, onNavigate }) => {
           <div className="hidden md:flex items-center gap-3">
             {isAuthenticated ? (
               <>
+                {/* Email Progress Updates Button */}
+                {onOpenEmails && (
+                  <button
+                    onClick={onOpenEmails}
+                    title={`Progress Updates Dispatched to ${user?.email || 'your email'}`}
+                    aria-label="Email Updates"
+                    className="relative p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+                  >
+                    <Mail className="w-5 h-5 text-blue-400" />
+                  </button>
+                )}
+
                 {/* Notifications Button */}
                 <button
                   onClick={() => handleNavClick('notifications')}
@@ -209,16 +223,27 @@ export const Navbar: React.FC<NavbarProps> = ({ currentRoute, onNavigate }) => {
           {/* Mobile Menu Hamburger */}
           <div className="flex md:hidden items-center gap-2">
             {isAuthenticated && (
-              <button
-                onClick={() => handleNavClick('notifications')}
-                className="relative p-2 text-slate-300 hover:text-white"
-                aria-label="Notifications"
-              >
-                <Bell className="w-5 h-5" />
-                {unreadNotificationsCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full" />
+              <>
+                {onOpenEmails && (
+                  <button
+                    onClick={onOpenEmails}
+                    className="relative p-2 text-slate-300 hover:text-white"
+                    aria-label="Email Updates"
+                  >
+                    <Mail className="w-5 h-5 text-blue-400" />
+                  </button>
                 )}
-              </button>
+                <button
+                  onClick={() => handleNavClick('notifications')}
+                  className="relative p-2 text-slate-300 hover:text-white"
+                  aria-label="Notifications"
+                >
+                  <Bell className="w-5 h-5" />
+                  {unreadNotificationsCount > 0 && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full" />
+                  )}
+                </button>
+              </>
             )}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}

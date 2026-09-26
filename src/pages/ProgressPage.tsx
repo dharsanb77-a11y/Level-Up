@@ -63,17 +63,17 @@ export const ProgressPage: React.FC<ProgressPageProps> = ({ onNavigate }) => {
   const overallRoadmapStats = RoadmapService.getOverallStats(roadmap);
   const categoryProgress = RoadmapService.getCategoryProgress(roadmap);
 
-  // Overall completion formula: 40% roadmap completion + 40% assessment coverage (4 categories) + 20% profile/domain setup
+  // Overall completion formula based purely on dynamic user accomplishments:
+  // Starts at 0 until user begins completing milestones or assessments
   const assessmentCategoryCount = new Set(results.map((r) => r.category)).size;
   const assessmentCoverageRate = Math.min(1, assessmentCategoryCount / 4);
   const roadmapCompletionRate = overallRoadmapStats.totalActivities > 0 
     ? (overallRoadmapStats.completedActivities / overallRoadmapStats.totalActivities) 
     : 0;
-  const profileRate = (user?.onboardingCompleted ? 0.6 : 0) + (user?.cgpa ? 0.2 : 0) + (user?.targetCompanies?.length ? 0.2 : 0);
 
-  const overallCompletionPercentage = Math.round(
-    (roadmapCompletionRate * 0.45 + assessmentCoverageRate * 0.40 + profileRate * 0.15) * 100
-  );
+  const overallCompletionPercentage = (roadmapCompletionRate === 0 && assessmentCoverageRate === 0)
+    ? 0
+    : Math.round((roadmapCompletionRate * 0.55 + assessmentCoverageRate * 0.45) * 100);
 
   const completedActivitiesList = roadmap.filter((a) => a.status === 'completed');
 

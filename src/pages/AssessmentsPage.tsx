@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { StorageService } from '../services/storage';
 import { AnalyticsService } from '../services/analytics';
+import { EmailService } from '../services/emailService';
 import { PageRoute, Assessment, AssessmentQuestion, AssessmentResult, AssessmentCategory } from '../types';
 import { 
   FileCheck2, 
@@ -21,7 +22,8 @@ import {
   Award,
   Layers,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  ExternalLink
 } from 'lucide-react';
 
 interface AssessmentsPageProps {
@@ -56,14 +58,28 @@ export const AssessmentsPage: React.FC<AssessmentsPageProps> = ({ onNavigate }) 
     return test.type.toLowerCase() === filterType.toLowerCase();
   });
 
-  // Start test
+  // Start test - launches in new tab with email dispatch
   const handleStartTest = (test: Assessment) => {
-    setActiveTest(test);
-    setCurrentQuestionIndex(0);
-    setUserAnswers({});
-    setTestStartTime(Date.now());
-    setActiveResult(null);
-    setShowConfirmSubmit(false);
+    if (user) {
+      EmailService.sendProgressEmail(user, 'assessment_started', {
+        assessmentTitle: test.title
+      });
+      StorageService.recordActivity(user.id);
+    }
+
+    const baseUrl = window.location.origin + window.location.pathname;
+    const targetUrl = `${baseUrl}#/assessment-session?id=${test.id}`;
+
+    const newWin = window.open(targetUrl, '_blank');
+    if (!newWin || newWin.closed || typeof newWin.closed === 'undefined') {
+      // If popup blocker intervened, fall back to in-place runner
+      setActiveTest(test);
+      setCurrentQuestionIndex(0);
+      setUserAnswers({});
+      setTestStartTime(Date.now());
+      setActiveResult(null);
+      setShowConfirmSubmit(false);
+    }
   };
 
   // Retake test
@@ -109,6 +125,13 @@ export const AssessmentsPage: React.FC<AssessmentsPageProps> = ({ onNavigate }) 
 
     StorageService.saveAssessmentResult(evaluation);
     StorageService.recordActivity(user.id);
+
+    // Send cheerful email update
+    EmailService.sendProgressEmail(user, 'assessment_completed', {
+      assessmentTitle: activeTest.title,
+      score: evaluation.percentage
+    });
+
     triggerRefresh();
 
     // Switch to result view
@@ -787,10 +810,10 @@ export const AssessmentsPage: React.FC<AssessmentsPageProps> = ({ onNavigate }) 
                       <button
                         type="button"
                         onClick={() => handleStartTest(test)}
-                        className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 shadow-md shadow-blue-950"
+                        className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 shadow-md shadow-blue-950 cursor-pointer group"
                       >
                         <span>Start Diagnostic Test</span>
-                        <ArrowRight className="w-4 h-4" />
+                        <ExternalLink className="w-3.5 h-3.5 text-blue-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                       </button>
                     )}
                   </div>
