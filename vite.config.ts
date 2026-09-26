@@ -5,7 +5,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig(() => {
   return {
-    base: '/YOUR-REPOSITORY-NAME/',
+    base: '/Level-Up/',
 
     plugins: [react(), tailwindcss()],
 
