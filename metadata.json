@@ -1,0 +1,6 @@
+{
+  "name": "PlacementReady",
+  "description": "Personalized placement preparation platform empowering college students with tailored roadmaps, skills assessment, and career readiness.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
